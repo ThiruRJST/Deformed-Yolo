@@ -2,7 +2,7 @@ from cfg_parse import parse_cfg
 from custom_ops import DeformableConv2d, EmptyLayer
 import torch.nn as nn
 from torchsummary import summary
-model_list = parse_cfg("cfgs/darknet53_DeformConv.cfg")
+
 # print(model_list)
 
 
@@ -88,4 +88,30 @@ def create_blocks(blocks):
     return module_list
 
 
-# print(create_blocks(model_list))
+
+class Deformed_Darknet53(nn.Module):
+    """Custom Made Backbone network for the detection model that makes use of Deformable Convolution"""
+    def __init__(self):
+        super(Deformed_Darknet53, self).__init__()
+        self.model_list = parse_cfg("cfgs/darknet53_DeformConv.cfg")
+        self.module_list = create_blocks(self.model_list)
+
+
+
+
+    def forward(self, x):
+
+        return x
+
+
+
+bl = create_blocks(parse_cfg("cfgs/darknet53_DeformConv.cfg"))
+
+for i,n in enumerate(bl):
+    
+
+
+        
+
+
+
