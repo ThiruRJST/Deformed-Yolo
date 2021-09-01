@@ -90,9 +90,11 @@ def create_blocks(blocks):
 
 
 class Deformed_Darknet53(nn.Module):
-    """Custom Made Backbone network for the detection model that makes use of Deformable Convolution"""
+
+    
     def __init__(self):
         super(Deformed_Darknet53, self).__init__()
+
         self.model_list = parse_cfg("cfgs/darknet53_DeformConv.cfg")
         self.module_list = create_blocks(self.model_list)
 
@@ -100,18 +102,26 @@ class Deformed_Darknet53(nn.Module):
 
 
     def forward(self, x):
+        outputs = {}
+        for i,module in enumerate(self.model_list[1:]):
+            module_type = module['type']
+            if module_type == "convolutional" or "deformable":
+                x = self.module_list[i](x)
+                print(x.shape)
 
+            elif module_type == "shortcut":
+                from_ = int(module['from'])
+                x = outputs[i-1] + outputs[i+from_]
+            
+            outputs[i] = x
+
+        
         return x
 
 
-
-bl = create_blocks(parse_cfg("cfgs/darknet53_DeformConv.cfg"))
-
-for i,n in enumerate(bl):
-    
-
-
-        
+model = Deformed_Darknet53()
+model = model.to("cuda:0")
+print(summary(model,input_size=(3,256,256)))
 
 
 
