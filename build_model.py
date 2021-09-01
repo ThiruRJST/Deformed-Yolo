@@ -88,40 +88,30 @@ def create_blocks(blocks):
     return module_list
 
 
-
 class Deformed_Darknet53(nn.Module):
 
-    
     def __init__(self):
         super(Deformed_Darknet53, self).__init__()
 
         self.model_list = parse_cfg("cfgs/darknet53_DeformConv.cfg")
         self.module_list = create_blocks(self.model_list)
 
-
-
-
     def forward(self, x):
         outputs = {}
-        for i,module in enumerate(self.model_list[1:]):
+        for i, module in enumerate(self.model_list[1:]):
             module_type = module['type']
-            if module_type == "convolutional" or "deformable":
+            if module_type == "convolutional" or module_type == "deformable":
                 x = self.module_list[i](x)
-                print(x.shape)
 
             elif module_type == "shortcut":
                 from_ = int(module['from'])
                 x = outputs[i-1] + outputs[i+from_]
-            
+
             outputs[i] = x
 
-        
         return x
 
 
 model = Deformed_Darknet53()
 model = model.to("cuda:0")
-print(summary(model,input_size=(3,256,256)))
-
-
-
+print(summary(model, input_size=(3, 256, 256)))
