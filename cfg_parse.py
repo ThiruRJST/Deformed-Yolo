@@ -19,7 +19,7 @@ def parse_cfg(cfgfile):
     for line in lines:
         if line[0] == "[":
             if len(block) !=0:
-                print(block)
+                #print(block)
                 blocks.append(block)
                 block = {}
             block['type'] = line[1:-1].rstrip()
@@ -34,4 +34,4 @@ def parse_cfg(cfgfile):
 
 
 
-net = parse_cfg("D:\ObjDet\darknet53_DeformConv.cfg")
+
