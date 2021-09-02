@@ -18,7 +18,7 @@ def create_blocks(blocks):
             # print("0")
             activation = x['activation']
             try:
-                batch_norm = int(x['batch_norm'])
+                batch_norm = int(x['batch_normalize'])
                 bias = False
             except:
                 batch_norm = 0
@@ -45,6 +45,9 @@ def create_blocks(blocks):
             if activation == "mish":
                 activation_fn = nn.Mish()
                 module.add_module("Mish_{}".format(i), activation_fn)
+            elif activation == "leaky":
+                activation_fn = nn.LeakyReLU()
+                module.add_module("Leaky_ReLU{}".format(i),activation_fn)
 
         elif(x['type'] == "deformable"):
             # print("1")
@@ -77,10 +80,17 @@ def create_blocks(blocks):
             if activation == "mish":
                 activation_fn = nn.Mish()
                 module.add_module("Mish_{}".format(i), activation_fn)
+            elif activation == "leaky":
+                activation_fn = nn.LeakyReLU()
+                module.add_module("Leaky_ReLU{}".format(i),activation_fn)
 
         elif(x['type'] == 'shortcut'):
             shortcut = EmptyLayer()
             module.add_module("Shortcut_{}".format(i), shortcut)
+        
+        elif(x['type'] == 'avgpool'):
+            pool = nn.AdaptiveAvgPool2d(output_size=(1,1))
+            module.add_module("AvgPool{}".format(i),pool)
 
         module_list.append(module)
         prev_filter = filters
@@ -95,23 +105,23 @@ class Deformed_Darknet53(nn.Module):
 
         self.model_list = parse_cfg("cfgs/darknet53_DeformConv.cfg")
         self.module_list = create_blocks(self.model_list)
+        #print(self.module_list)
 
     def forward(self, x):
         outputs = {}
         for i, module in enumerate(self.model_list[1:]):
             module_type = module['type']
-            if module_type == "convolutional" or module_type == "deformable":
+            if module_type == "convolutional" or module_type == "deformable" or module_type == "avgpool":
                 x = self.module_list[i](x)
 
             elif module_type == "shortcut":
                 from_ = int(module['from'])
                 x = outputs[i-1] + outputs[i+from_]
 
+            
+
             outputs[i] = x
 
         return x
 
 
-model = Deformed_Darknet53()
-model = model.to("cuda:0")
-print(summary(model, input_size=(3, 256, 256)))
