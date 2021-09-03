@@ -8,9 +8,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 import os
 import numpy as np
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 import cv2
+import torch.nn.functional as F
 import random
 
 from sklearn.model_selection import StratifiedKFold
@@ -23,12 +26,21 @@ random.seed(2021)
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.deterministic = True
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+TOTAL_EPOCHS = 100
+writer = SummaryWriter()
+
 
 print("***** Loading the Model in {} *****".format(DEVICE))
 
 Model = Deformed_Darknet53().to(DEVICE)
 
 print("Model Shipped to {}".format(DEVICE))
+
+data = pd.read_csv("data.csv")
+
+loss_fn = F.binary_cross_entropy()
+
+optim = torch.optim.Adam(Model.parameters())
 
 class dog_cat(Dataset):
     def __init__(self,df,mode="train",folds=0,transforms=None):
@@ -59,8 +71,39 @@ class dog_cat(Dataset):
         return image,label
 
 
+def train_loop(epoch,dataloader,model,loss_fn,optim,device=DEVICE):
+    epoch_loss = 0
+    pbar = tqdm(enumerate(dataloader))
+    for i,(img,label) in pbar:
+        img = img.to(DEVICE)
+        label = label.to(DEVICE)
+        yhat = model(img)
+        #Loss Calculation
+        train_loss = loss_fn(input = yhat, target = label)
+
+        #Reset Optimizer
+        optim.zero_grad()
+        train_loss.backward()
+        optim.step()
+
+        
+        epoch_loss += train_loss.item()
+    print(f"Epoch:{epoch}/{TOTAL_EPOCHS} Epoch Loss:{epoch_loss / len(dataloader):.5f}")
+        
+    
 
 
+if __name__ == "__main__":
+
+    train = dog_cat(data,transforms=Compose([Resize(512,512),ToTensorV2()]))
+    val = dog_cat(data,mode='val',transforms=Compose([Resize(512,512),ToTensorV2()]))
+
+    train_load = DataLoader(train,batch_size=16,num_workers=4)
+    val_load = DataLoader(val,batch_size=16,num_workers=4)
+
+    images,labels = next(iter(train_load))
+
+    print(images.shape,labels.shape)
 
 
 
