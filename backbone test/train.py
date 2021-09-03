@@ -30,20 +30,37 @@ Model = Deformed_Darknet53().to(DEVICE)
 
 print("Model Shipped to {}".format(DEVICE))
 
-train_data = torchvision.datasets.ImageNet(split="train",transforms=Compose([Resize(512,512),ToTensorV2()]),download=True)
-val_data = torchvision.datasets.ImageNet(split="val",transforms=Compose([Resize(512,512),ToTensorV2()]),download=True)
+class dog_cat(Dataset):
+    def __init__(self,df,mode="train",folds=0,transforms=None):
+        super(dog_cat,self).__init__()
+        self.df = df
+        self.mode = mode
+        self.folds = folds
+        self.transforms = transforms
+
+        if self.mode == "train":
+            self.data = self.df[self.df.folds != self.folds].reset_index(drop=True)
+            
+        else:
+            self.data = self.df[self.df.folds == self.folds].reset_index(drop=True)
+        
+    def __len__(self):
+        return len(self.data)
+        
+    def __getitem__(self,idx):
+
+        img = cv2.imread(self.data.loc[idx,"Paths"])
+        label = self.data.loc[idx,'Labels']
+
+        if self.transforms is not None:
+            image = self.transforms(image=img)['image']
+
+        
+        return image,label
 
 
 
 
-if __name__ == "__main__":
-    print("Sanity Check")
-   
 
-    train_load = DataLoader(train_data, batch_size=16, num_workers=4, shuffle=True)
-    val_load = DataLoader(val_data, batch_size=16, num_workers=4, shuffle=False)
 
-    image,labels = next(iter(train_load))
-    val_image,val_labels = next(iter(val_load))
-    print("Train:{}\n".format(image.shape),
-          "Val:{}".format(val_image.shape))
+

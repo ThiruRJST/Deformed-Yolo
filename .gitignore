@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+train/
+test1/
+
+train.zip
+test1.zip
+
 kagglecatsanddogs_3367a.zip
 kagglecatsanddogs_3367a/
 
