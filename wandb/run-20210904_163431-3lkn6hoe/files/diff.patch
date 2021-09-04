@@ -1,0 +1,185 @@
+diff --git a/build_model.py b/build_model.py
+index 9f0cd3c..d1950a9 100644
+--- a/build_model.py
++++ b/build_model.py
+@@ -103,7 +103,7 @@ class Deformed_Darknet53(nn.Module):
+     def __init__(self):
+         super(Deformed_Darknet53, self).__init__()
+ 
+-        self.model_list = parse_cfg("cfgs/darknet53_DeformConv.cfg")
++        self.model_list = parse_cfg("cfgs/new-darknet.cfg")
+         self.module_list = create_blocks(self.model_list)
+         #print(self.module_list)
+ 
+diff --git a/callbacks.py b/callbacks.py
+index e2cb637..fe2aed4 100644
+--- a/callbacks.py
++++ b/callbacks.py
+@@ -1,21 +1,28 @@
++import torch
++import os
++import time
+ class EarlyStopping():
+-    def __init__(self,patience=5,min_delta=0):
++    def __init__(self,path=None, name=None, patience=5, min_delta=0):
+         self.patience = patience
+         self.min_delta = min_delta
+         self.counter = 0
+         self.best_loss = None
++        self.path = os.getcwd() if None else path
++        self.name = time.time() if None else name
+         self.early_stop = False
+ 
+-    def __call__(self, val_loss):
++    def __call__(self, Model, val_loss):
+ 
+         if self.best_loss == None:
+             self.best_loss = val_loss
++
+         elif self.best_loss - val_loss > self.min_delta:
+             self.best_loss = val_loss
++            print("Saving the best Model State Dict")
++            torch.save(Model.state_dict(),os.path.join(self.path,f"{self.name}_{self.best_loss}"))
+         elif self.best_loss - val_loss < self.min_delta:
+             self.counter += 1
+             print(f"Early Stopping Counter {self.counter}/{self.patience}")
+             if self.counter >= self.patience:
+                 print("EARLY STOPPING")
+                 self.early_stop = True
+-        
+\ No newline at end of file
+diff --git a/train.py b/train.py
+index d1d9ab2..f01e8e5 100644
+--- a/train.py
++++ b/train.py
+@@ -2,8 +2,9 @@ from pandas.core.algorithms import mode
+ 
+ import torch
+ import torch.nn as nn
+-from albumentations import Compose,Resize
++from albumentations import Compose,Resize,Normalize
+ from albumentations.pytorch import ToTensorV2
++import wandb
+ import time
+ import torchvision
+ import torch.nn.functional as F
+@@ -12,7 +13,7 @@ from torch.cuda.amp import autocast,GradScaler
+ import os
+ import numpy as np
+ from tqdm import tqdm
+-from torch.utils.tensorboard import SummaryWriter
++
+ from callbacks import EarlyStopping
+ import pandas as pd
+ from torch.utils.data import Dataset, DataLoader
+@@ -31,8 +32,8 @@ torch.backends.cudnn.deterministic = True
+ DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+ TOTAL_EPOCHS = 100
+ scaler = GradScaler()
+-writer = SummaryWriter()
+ early_stop = EarlyStopping()
++wandb.init(project='deformed-darknet',entity='tensorthug',name='new-darknet-256x256_32')
+ 
+ 
+ 
+@@ -49,6 +50,8 @@ val_loss_fn = nn.BCEWithLogitsLoss()
+ 
+ optim = torch.optim.Adam(Model.parameters())
+ 
++wandb.watch(Model)
++
+ class dog_cat(Dataset):
+     def __init__(self,df,mode="train",folds=0,transforms=None):
+         super(dog_cat,self).__init__()
+@@ -83,7 +86,7 @@ def train_loop(epoch,dataloader,model,loss_fn,optim,device=DEVICE):
+     epoch_loss = 0
+     epoch_acc = 0
+     #start_time = time.time()
+-    pbar = tqdm(enumerate(dataloader))
++    pbar = tqdm(enumerate(dataloader),total=len(dataloader))
+     for i,(img,label) in pbar:
+         optim.zero_grad()
+ 
+@@ -111,8 +114,8 @@ def train_loop(epoch,dataloader,model,loss_fn,optim,device=DEVICE):
+     train_epoch_loss = epoch_loss / len(dataloader)
+     train_epoch_acc = epoch_acc / len(dataloader)
+ 
+-    writer.add_scalar("Training_Loss",train_epoch_loss,epoch)
+-    writer.add_scalar("Training_Acc",train_epoch_acc,epoch)
++    wandb.log({"Training_Loss":train_epoch_loss})
++    wandb.log({"Training_Acc":train_epoch_acc})
+         
+     #print(f"Epoch:{epoch}/{TOTAL_EPOCHS} Epoch Loss:{epoch_loss / len(dataloader):.4f} Epoch Acc:{epoch_acc / len(dataloader):.4f}")
+     
+@@ -122,18 +125,18 @@ def val_loop(epoch,dataloader,model,loss_fn,device = DEVICE):
+     model.eval()
+     val_epoch_loss = 0
+     val_epoch_acc = 0
+-    pbar = tqdm(enumerate(dataloader))
++    pbar = tqdm(enumerate(dataloader),total=len(dataloader))
+ 
+     with torch.no_grad():
+         for i,(img,label) in pbar:
+-            img = img.to(device)
+-            label = label.to(device)
++            img = img.to(device).float()
++            label = label.to(device).float()
+ 
+-            yhat = model(img).flatten()
+-            val_loss = loss_fn(input=yhat,target=label)
++            yhat = model(img)
++            val_loss = loss_fn(input=yhat.flatten(),target=label)
+ 
+-            out = (yhat>0.5).float()
+-            correct = (yhat == label).float().sum()
++            out = (yhat.flatten().sigmoid()>0.5).float()
++            correct = (label == out).float().sum()
+ 
+             val_epoch_loss += val_loss.item()
+             val_epoch_acc += correct.item() / out.shape[0]
+@@ -141,8 +144,8 @@ def val_loop(epoch,dataloader,model,loss_fn,device = DEVICE):
+         val_lossd = val_epoch_loss / len(dataloader)
+         val_accd = val_epoch_acc / len(dataloader)
+         
+-        writer.add_scalar("Val_Loss",val_lossd,epoch)
+-        writer.add_scalar("Val_Acc",val_accd/len(dataloader),epoch)
++        wandb.log({"Val_Loss":val_lossd,"Epoch":epoch})
++        wandb.log({"Val_Acc":val_accd/len(dataloader),"Epoch":epoch})
+ 
+         return val_lossd,val_accd
+ 
+@@ -159,11 +162,11 @@ if __name__ == "__main__":
+ 
+     train_per_epoch_loss,train_per_epoch_acc = [],[]
+     val_per_epoch_loss,val_per_epoch_acc = [],[]
+-    train = dog_cat(data,transforms=Compose([Resize(256,256),ToTensorV2()]))
+-    val = dog_cat(data,mode='val',transforms=Compose([Resize(256,256),ToTensorV2()]))
++    train = dog_cat(data,transforms=Compose([Resize(256,256),Normalize(),ToTensorV2()]))
++    val = dog_cat(data,mode='val',transforms=Compose([Resize(256,256),Normalize(),ToTensorV2()]))
+ 
+-    train_load = DataLoader(train,batch_size=16,num_workers=4)
+-    val_load = DataLoader(val,batch_size=16,num_workers=4)
++    train_load = DataLoader(train,batch_size=32,shuffle=True,num_workers=4)
++    val_load = DataLoader(val,batch_size=32,num_workers=4)
+ 
+     for e in range(TOTAL_EPOCHS):
+         train_loss,train_acc = train_loop(e,train_load,Model,train_loss_fn,optim)
+@@ -172,15 +175,8 @@ if __name__ == "__main__":
+         train_per_epoch_acc.append(train_acc)
+         val_per_epoch_loss.append(val_loss)
+         val_per_epoch_acc.append(val_acc)
+-        early_stop(val_loss)
++        print(f"TrainLoss:{train_loss:.4f} TrainAcc:{train_acc:.4f}")
++        print(f"ValLoss:{val_loss:.4f} ValAcc:{val_acc:.4f}")
++        early_stop(Model,val_loss)
+         if early_stop.early_stop:
+             break
+-
+-
+-        
+-
+-
+-
+-
+-
+-

@@ -103,7 +103,7 @@ class Deformed_Darknet53(nn.Module):
     def __init__(self):
         super(Deformed_Darknet53, self).__init__()
 
-        self.model_list = parse_cfg("cfgs/darknet53_DeformConv.cfg")
+        self.model_list = parse_cfg("cfgs/new-darknet.cfg")
         self.module_list = create_blocks(self.model_list)
         #print(self.module_list)
 

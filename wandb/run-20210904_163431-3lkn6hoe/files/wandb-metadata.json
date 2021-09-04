@@ -1,0 +1,24 @@
+{
+    "os": "Linux-5.11.0-27-generic-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "heartbeatAt": "2021-09-04T11:04:33.115207",
+    "startedAt": "2021-09-04T11:04:31.581098",
+    "docker": null,
+    "gpu": "NVIDIA GeForce RTX 2070 SUPER",
+    "gpu_count": 1,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "https://github.com/ThiruRJST/Deformed-Yolo.git",
+        "commit": "1ce7422f0a686517576bf25792af72e30482a54d"
+    },
+    "email": "maroonbleed007@gmail.com",
+    "root": "/home/lustbeast/Deformed-YOLO",
+    "host": "lustbeast-ThinkStation-P330",
+    "username": "lustbeast",
+    "executable": "/home/lustbeast/.virtualenvs/baseline/bin/python3"
+}
